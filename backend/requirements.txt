@@ -1,0 +1,25 @@
+# ── Web Framework ──────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# ── Async HTTP (downstream forwarding / CRM calls) ─────
+httpx==0.27.2
+
+# ── Task Queue (async processing after receive) ────────
+celery==5.4.0
+redis==5.0.8
+
+# ── Database ───────────────────────────────────────────
+sqlalchemy==2.0.32
+alembic==1.13.2
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# ── Validation / Settings ──────────────────────────────
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# ── Auth (verify incoming Bearer / API key headers) ────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==43.0.0
