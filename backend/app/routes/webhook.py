@@ -53,7 +53,7 @@ async def receive_bolna_webhook(
 
     # immediately return 200 to Bolna — never make Bolna wait
     return WebhookAckResponse(
-        execution_id=payload.execution_id,
+        execution_id=payload.execution_id or payload.id or "unknown",
         status="queued",
         message="Webhook received and queued for processing",
     )

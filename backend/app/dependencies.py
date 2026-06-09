@@ -36,22 +36,29 @@ async def verify_auth_header(
     return credentials.credentials
 
 
+# ── Extract tenant ID from header ──────────────────────
+# Used by executions route for read endpoints
+async def get_tenant_id(
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+) -> str:
+    if x_tenant_id is None:
+        raise TenantNotFoundError("missing")
+    if x_tenant_id not in settings.tenant_list:
+        raise TenantNotFoundError(x_tenant_id)
+    return x_tenant_id
+
+
 # ── Cross-verify X-API-Key belongs to X-Tenant-ID ─────
-# This is the structural cross-verification:
-# API key must match the specific tenant — not just be any valid key
 async def verify_api_key_for_tenant(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
 
-    # check headers present
     if x_api_key is None:
         raise WebhookAuthError("Missing X-API-Key header")
     if x_tenant_id is None:
         raise TenantNotFoundError("missing")
-
-    # check tenant is in allowed list
     if x_tenant_id not in settings.tenant_list:
         raise TenantNotFoundError(x_tenant_id)
 
@@ -60,14 +67,13 @@ async def verify_api_key_for_tenant(
     cached_key = await cache_get(cache_key)
 
     if cached_key:
-        # cross-verify: API key must match this tenant's stored key
         if x_api_key != cached_key:
             raise WebhookAuthError(
                 f"X-API-Key does not match tenant '{x_tenant_id}'"
             )
         return {"api_key": x_api_key, "tenant_id": x_tenant_id}
 
-    # fallback: check DB for tenant-specific API key
+    # fallback: check DB
     result = await db.execute(
         select(Tenant).where(
             Tenant.tenant_id == x_tenant_id,
@@ -77,15 +83,12 @@ async def verify_api_key_for_tenant(
     tenant = result.scalar_one_or_none()
 
     if tenant:
-        # tenant exists in DB — verify API key matches this tenant
         await cache_set(cache_key, tenant.api_key, ttl=300)
         if x_api_key != tenant.api_key:
             raise WebhookAuthError(
                 f"X-API-Key does not match tenant '{x_tenant_id}'"
             )
     else:
-        # tenant not in DB yet — fall back to global X_API_KEY from settings
-        # useful during initial setup before tenant is registered
         if x_api_key != settings.X_API_KEY:
             raise WebhookAuthError(
                 f"X-API-Key does not match tenant '{x_tenant_id}'"

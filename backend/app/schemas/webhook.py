@@ -1,33 +1,47 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Any
 from datetime import datetime
 
 
 # ── Bolna incoming payload ─────────────────────────────
-# Shape Bolna POSTs to your Analytics tab webhook URL
+# Bolna sends "id" not "execution_id"
 class BolnaWebhookPayload(BaseModel):
 
-    execution_id: str = Field(..., description="Bolna execution ID")
-    agent_id: str = Field(..., description="Bolna agent ID")
+    # Bolna's actual field name is "id"
+    id: Optional[str] = Field(None, description="Bolna execution ID")
+    execution_id: Optional[str] = Field(None, description="Execution ID alias")
 
-    # scheduled | queued | in_progress | completed | failed
+    agent_id: str = Field(..., description="Bolna agent ID")
     status: str = Field(..., description="Call status from Bolna")
 
-    # optional fields Bolna may include
-    transcript: Optional[str] = Field(None, description="Call transcript")
-    recording_url: Optional[str] = Field(None, description="Recording URL")
-    duration: Optional[float] = Field(None, description="Call duration in seconds")
-    from_number: Optional[str] = Field(None, description="Caller number")
-    to_number: Optional[str] = Field(None, description="Recipient number")
-    started_at: Optional[datetime] = Field(None, description="Call start time")
-    ended_at: Optional[datetime] = Field(None, description="Call end time")
+    # call data
+    transcript: Optional[str] = Field(None)
+    recording_url: Optional[str] = Field(None)
+    conversation_duration: Optional[float] = Field(None)
+    total_cost: Optional[float] = Field(None)
+    error_message: Optional[str] = Field(None)
+    summary: Optional[str] = Field(None)
 
-    # catch any extra fields Bolna sends
+    # numbers
+    user_number: Optional[str] = Field(None)
+    agent_number: Optional[str] = Field(None)
+
+    # timestamps
+    initiated_at: Optional[str] = Field(None)
+    created_at: Optional[str] = Field(None)
+    updated_at: Optional[str] = Field(None)
+
+    # derive execution_id from id if not provided
+    @model_validator(mode="after")
+    def set_execution_id(self):
+        if not self.execution_id and self.id:
+            self.execution_id = self.id
+        return self
+
     model_config = {"extra": "allow"}
 
 
 # ── Webhook received response ──────────────────────────
-# What your endpoint returns to Bolna immediately
 class WebhookAckResponse(BaseModel):
     status: str = "queued"
     execution_id: str
@@ -35,7 +49,6 @@ class WebhookAckResponse(BaseModel):
 
 
 # ── Execution log response ─────────────────────────────
-# What GET /executions returns
 class ExecutionLogResponse(BaseModel):
     id: str
     execution_id: str
